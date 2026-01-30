@@ -11,11 +11,18 @@
 - 🔐 **安全认证**: 使用Bearer Token认证机制
 - 📊 **高级查询**: 支持数据筛选器、分页查询
 - 📁 **文件上传**: 获取文件上传凭证
+新增
+- 🔍 **自然语言输入**:自然语言输入即可调取MCP获取相应数据结果
+- 📊 **获取部门成员**能够（递归）获取指定部门编号下的所有成员。
+- 📊 **获取部门列表**：能够（递归）获取指定部门 id 的所有子部门。
+改进
+- 🔄 **API接口更新**: 部分工具的函数接口错误，当前已更新
+
 
 ## 安装
 
 ```bash
-cd jiandaoyun-mcp-server
+cd jiandaoyun-mcp
 npm install
 npm run build
 ```
@@ -404,7 +411,9 @@ npm start
 - 网络错误
 - 字段不匹配警告
 - 数据格式转换错误
-
+## 参考来源/Acknowledgements
+本项目开发过程中，参考/复用了以下仓库的核心代码逻辑，在此表示感谢：
+1. 【jiandaoyun-mcp-server】：https://github.com/cheungxin/jiandaoyun-mcp-server（参考了工具函数功能）
 ## 许可证
 
 MIT
