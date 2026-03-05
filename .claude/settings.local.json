@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(npm run build:*)",
+      "Bash(echo:*)",
+      "Bash(cmd:*)",
+      "Bash(set:*)",
+      "Bash(node:*)",
+      "Bash(curl:*)",
+      "Bash(test:*)",
+      "Bash(powershell:*)",
+      "Bash(where:*)",
+      "Bash(python:*)",
+      "Bash(pip install:*)",
+      "Bash(playwright install:*)",
+      "Bash(D:pythonpython.exe -m pip install playwright)",
+      "Bash(D:pythonpython.exe:*)",
+      "Bash(\"D:\\\\python\\\\python.exe\" -m pip install:*)",
+      "Bash(\"D:\\\\python\\\\python.exe\" -m playwright install:*)",
+      "Bash(\"D:\\\\python\\\\python.exe\":*)",
+      "mcp__web-search-prime__webSearchPrime",
+      "mcp__web-reader__webReader",
+      "Bash(ls:*)"
+    ]
+  }
+}

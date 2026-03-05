@@ -1,0 +1,160 @@
+[
+  {
+    "timestamp": "2026-02-14 15:30:00",
+    "action": "创建文档",
+    "document": "产品规划与当前进度.md",
+    "changes": [
+      "创建产品规划与当前进度文档",
+      "记录已完成里程碑",
+      "记录进行中任务",
+      "记录待办任务"
+    ],
+    "trigger": "手动触发"
+  },
+  {
+    "timestamp": "2026-02-14 15:35:00",
+    "action": "创建文档",
+    "document": "DEVELOPMENT_GUIDE.html",
+    "changes": [
+      "创建开发指南文档",
+      "包含项目简介、开发环境准备、项目结构",
+      "包含快速开始、开发流程、MCP工具开发",
+      "包含测试、部署、常见问题"
+    ],
+    "trigger": "手动触发"
+  },
+  {
+    "timestamp": "2026-02-14 15:40:00",
+    "action": "创建文档",
+    "document": "自建插件最佳实践.md",
+    "changes": [
+      "创建最佳实践文档",
+      "包含项目概述、认证配置",
+      "包含数据操作、错误处理",
+      "包含性能优化、安全最佳实践"
+    ],
+    "trigger": "手动触发"
+  },
+  {
+    "timestamp": "2026-02-14 16:00:00",
+    "action": "更新文档",
+    "document": "自建插件最佳实践.html",
+    "changes": [
+      "使用精美 HTML 格式重新创建最佳实践文档",
+      "参考 best-practices.html 和 jiandaoyun-mcp-docs.html 的样式",
+      "包含项目概述、认证配置、数据操作",
+      "包含错误处理、性能优化、安全最佳实践"
+    ],
+    "trigger": "手动触发"
+  },
+  {
+    "timestamp": "2026-02-14 15:45:00",
+    "action": "创建文档",
+    "document": "PLUGIN_STRUCTURE_SPEC.md",
+    "changes": [
+      "创建开发规范文档",
+      "包含项目结构、代码规范",
+      "包含MCP工具开发规范、类型定义规范",
+      "包含错误处理规范、日志规范、测试规范"
+    ],
+    "trigger": "手动触发"
+  },
+  {
+    "timestamp": "2026-02-14 15:50:00",
+    "action": "创建配置",
+    "document": ".doc-config.json",
+    "changes": [
+      "创建文档配置文件",
+      "定义文档路径",
+      "定义里程碑",
+      "配置Git钩子"
+    ],
+    "trigger": "手动触发"
+  },
+  {
+    "timestamp": "2026-02-14 15:55:00",
+    "action": "创建文档",
+    "document": ".doc-update-history.json",
+    "changes": [
+      "创建文档更新历史文件",
+      "记录所有文档更新操作"
+    ],
+    "trigger": "手动触发"
+  },
+  {
+    "timestamp": "2026-02-14 17:00:00",
+    "action": "更新文档",
+    "document": "产品规划与当前进度.md",
+    "changes": [
+      "添加 HTTP/SSE 传输层实现的里程碑",
+      "更新版本历史到 v1.0.2"
+    ],
+    "trigger": "手动触发"
+  },
+  {
+    "timestamp": "2026-02-14 17:05:00",
+    "action": "更新文档",
+    "document": "PLUGIN_STRUCTURE_SPEC.md",
+    "changes": [
+      "更新项目结构，添加 http.ts 传输层",
+      "添加版本历史 v1.0.2"
+    ],
+    "trigger": "手动触发"
+  },
+  {
+    "timestamp": "2026-02-14 17:10:00",
+    "action": "创建文档",
+    "document": "开发指南.md",
+    "changes": [
+      "创建新的开发指南文档（Markdown 格式）",
+      "包含项目概述、开发环境、项目结构",
+      "包含快速开始、传输模式说明",
+      "包含核心模块、工具开发、测试调试"
+    ],
+    "trigger": "手动触发"
+  },
+  {
+    "timestamp": "2026-02-14 17:15:00",
+    "action": "创建文档",
+    "document": "最佳实践.md",
+    "changes": [
+      "创建新的最佳实践文档（Markdown 格式）",
+      "包含快速入门、配置最佳实践",
+      "包含工具使用指南、字段匹配技巧",
+      "包含性能优化、安全建议、常见问题"
+    ],
+    "trigger": "手动触发"
+  },
+  {
+    "timestamp": "2026-02-14 17:20:00",
+    "action": "更新配置",
+    "document": ".doc-config.json",
+    "changes": [
+      "更新文档路径配置",
+      "更新里程碑列表",
+      "更新版本号到 v1.0.2"
+    ],
+    "trigger": "手动触发"
+  },
+  {
+    "timestamp": "2026-02-15 20:12:40",
+    "action": "整理文档",
+    "document": "核心模板文件",
+    "changes": [
+      "best_practice_test-project.md",
+      "dev_guide_test-project.md",
+      "product_plan_test-project.md",
+      "structure_spec_test-project.md"
+    ],
+    "trigger": "手动触发"
+  },
+  {
+    "timestamp": "2026-02-15 20:12:55",
+    "action": "更新进度",
+    "document": "product_plan_jiandaoyun_mcp.md",
+    "changes": [
+      "### 自动记录 (2026-02-15 20:12:54)\n- 手动更新进度"
+    ],
+    "trigger": "手动触发"
+  }
+]
