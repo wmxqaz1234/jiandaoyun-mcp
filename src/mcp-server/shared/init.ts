@@ -61,10 +61,6 @@ function defineTools(): void {
     },
     async (args) => {
       try {
-        // 添加详细的调试日志
-        console.error(`[DEBUG] 进入 list_apps_and_forms 工具`);
-        console.error(`[DEBUG] 传入的参数:`, args);
-        
         // 获取参数默认值
         let appId: string | undefined;
         let appKey: string;
@@ -87,24 +83,14 @@ function defineTools(): void {
           };
         }
         
-        console.error(`[DEBUG] API Key: ${appKey.substring(0, 10)}...`);
-        console.error(`[DEBUG] Base URL: ${baseUrl}`);
-        console.error(`[DEBUG] App ID from params: ${args.appId || '未提供'}`);
-        console.error(`[DEBUG] App ID from default: ${appId || '未提供'}`);
-        
         const { appId: specificAppId } = args as { appId?: string };
         const targetAppId = specificAppId;
         // 检查 targetAppId 是否为有效的应用 ID（不是占位符）
         const isValidAppId = targetAppId && targetAppId !== 'your_app_id' && targetAppId.length > 0;
         
-        console.error(`[DEBUG] Target App ID: ${targetAppId || '未提供'}`);
-        console.error(`[DEBUG] Is valid App ID: ${isValidAppId}`);
-        
         if (isValidAppId) {
           // 获取特定应用的表单列表
           try {
-            console.error(`[DEBUG] 开始获取特定应用的表单列表: ${targetAppId}`);
-            
             const response = await httpRequest<any>(`${baseUrl}/api/v5/app/entry/list`, {
               method: 'POST',
               headers: {
@@ -114,10 +100,7 @@ function defineTools(): void {
               body: JSON.stringify({ app_id: targetAppId, skip: 0, limit: 0 })
             });
             
-            console.error(`[DEBUG] 获取表单列表响应:`, response);
-            
             const forms = response || [];
-            console.error(`[DEBUG] 获取到表单数量: ${forms.length}`);
             
             return {
               content: [{
@@ -138,7 +121,6 @@ function defineTools(): void {
               }]
             };
           } catch (error) {
-            console.error(`[DEBUG] 获取表单列表失败:`, error);
             return {
               content: [{
                 type: 'text',
@@ -156,8 +138,6 @@ function defineTools(): void {
         } else {
           // 获取所有应用列表
           try {
-            console.error(`[DEBUG] 开始获取所有应用列表`);
-            
             const response = await httpRequest<any>(`${baseUrl}/api/v5/app/list`, {
               method: 'POST',
               headers: {
@@ -167,10 +147,7 @@ function defineTools(): void {
               body: JSON.stringify({ skip: 0, limit: 100 })
             });
             
-            console.error(`[DEBUG] 获取应用列表响应:`, response);
-            
             const apps = response || [];
-            console.error(`[DEBUG] 获取到应用数量: ${apps.length}`);
             
             return {
               content: [{
@@ -190,7 +167,6 @@ function defineTools(): void {
               }]
             };
           } catch (error) {
-            console.error(`[DEBUG] 获取应用列表失败:`, error);
             return {
               content: [{
                 type: 'text',
@@ -206,7 +182,6 @@ function defineTools(): void {
           }
         }
       } catch (error) {
-        console.error(`[DEBUG] 工具执行失败:`, error);
         return {
           content: [{
             type: 'text',
@@ -325,11 +300,16 @@ function defineTools(): void {
     }
   );
 
-  // 提交表单数据
+  // 提交表单数据（支持单条和批量提交）
   registerTool(
     {
       name: 'submit_form_data',
-      description: '向指定表单提交数据。支持单条数据提交和批量提交，支持智能字段匹配',
+      description: `向指定表单提交数据。
+
+**单条提交**: \`data\` 传入单个对象，格式：\`{"字段名_1": "值1", "字段名_2": "值2"}\`
+**批量提交**: \`data\` 传入对象数组，格式：\`[{"字段名_1": "值1"}, {"字段名_1": "值A", "字段名_2": "值B"}\]
+
+注：批量提交最多支持 100 条数据。使用 \`transactionId\` 可实现幂等提交。`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -337,9 +317,16 @@ function defineTools(): void {
             type: 'string',
             description: '表单ID或应用ID'
           },
+          appId: {
+            type: 'string',
+            description: '应用ID（必需）'
+          },
           data: {
-            type: 'object',
-            description: '要提交的数据对象，键为字段名，值为字段值'
+            oneOf: [
+              { type: 'object', description: '单条数据对象，格式：{"字段名": "值"}' },
+              { type: 'array', items: { type: 'object' }, description: '批量数据数组，每条为单个对象' }
+            ],
+            description: '要提交的数据，单条传入对象，批量传入对象数组'
           },
           transactionId: {
             type: 'string',
@@ -347,25 +334,28 @@ function defineTools(): void {
           },
           dataCreator: {
             type: 'string',
-            description: '可选：数据创建者'
+            description: '可选：数据创建者（成员编号 username）'
           },
           isStartWorkflow: {
             type: 'boolean',
-            description: '可选：是否启动工作流'
+            description: '可选：是否启动工作流（仅流程表单有效）'
           },
           isStartTrigger: {
             type: 'boolean',
-            description: '可选：是否触发自动化'
+            description: '可选：是否触发智能助手'
           }
         },
-        required: ['formId', 'data']
+        required: ['formId', 'data', 'appId']
       }
     },
     async (args) => {
+      // 判断是单条还是批量
+      const isBatch = Array.isArray(args.data);
+
       // 验证必需参数
       const validationRules: Record<string, ValidationRule> = {
         formId: { required: true, type: 'string', minLength: 1 },
-        data: { required: true, type: 'object' }
+        data: { required: true, type: isBatch ? 'array' : 'object' }
       };
 
       const validation = validateInput(args, validationRules);
@@ -386,7 +376,7 @@ function defineTools(): void {
       let appId: string | undefined;
       let appKey: string;
       let baseUrl: string;
-      
+
       try {
         ({ appId, appKey, baseUrl } = getDefaultParams(args));
       } catch (error) {
@@ -417,40 +407,94 @@ function defineTools(): void {
 
       try {
         const resolved = await resolveFormId(formId, appKey, baseUrl);
-        
-        // 智能字段匹配
-        const mappingResult = await smartFieldMapping(resolved.formId, data, appKey, appId, baseUrl);
-        
-        const requestBody: Record<string, any> = {
-          entry_id: resolved.formId,
-          data: mappingResult.mappedData
-        };
 
-        if (transactionId) requestBody.transaction_id = transactionId;
-        if (dataCreator) requestBody.data_creator = dataCreator;
-        if (isStartWorkflow !== undefined) requestBody.is_start_workflow = isStartWorkflow;
-        if (isStartTrigger !== undefined) requestBody.is_start_trigger = isStartTrigger;
+        if (isBatch) {
+          // 批量提交：对每条数据进行字段映射
+          const wrappedDataList: Record<string, any>[] = [];
+          const allFieldInfo: Array<any> = [];
 
-        const response = await httpRequest(`${baseUrl}/api/v5/app/entry/data/create`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${appKey}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(requestBody)
-        });
+          for (const dataItem of data as Record<string, any>[]) {
+            const mappingResult = await smartFieldMapping(resolved.formId, dataItem, appKey, appId, baseUrl);
+            const wrappedData: Record<string, any> = {};
+            for (const [key, val] of Object.entries(mappingResult.mappedData)) {
+              wrappedData[key] = { value: val };
+            }
+            wrappedDataList.push(wrappedData);
+            allFieldInfo.push(...mappingResult.fieldInfo);
+          }
 
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({
-              success: true,
-              data: response,
-              formUsed: resolved.formId,
-              fieldMapping: mappingResult.fieldInfo
-            }, null, 2)
-          }]
-        };
+          const requestBody: Record<string, any> = {
+            app_id: appId,
+            entry_id: resolved.formId,
+            data_list: wrappedDataList
+          };
+
+          if (transactionId) requestBody.transaction_id = transactionId;
+          if (dataCreator) requestBody.data_creator = dataCreator;
+          if (isStartWorkflow !== undefined) requestBody.is_start_workflow = isStartWorkflow;
+
+          const response = await httpRequest(`${baseUrl}/api/v5/app/entry/data/batch_create`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${appKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+          });
+
+          return {
+            content: [{
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                data: response,
+                formUsed: resolved.formId,
+                submittedCount: wrappedDataList.length,
+                message: `批量提交成功，共提交 ${wrappedDataList.length} 条数据`
+              }, null, 2)
+            }]
+          };
+        } else {
+          // 单条提交：使用原有的智能字段匹配
+          const mappingResult = await smartFieldMapping(resolved.formId, data, appKey, appId, baseUrl);
+          const wrappedData: Record<string, any> = {};
+          for (const [key, val] of Object.entries(mappingResult.mappedData)) {
+            wrappedData[key] = { value: val };
+          }
+
+          const requestBody: Record<string, any> = {
+            app_id: appId,
+            entry_id: resolved.formId,
+            data: wrappedData
+          };
+
+          if (transactionId) requestBody.transaction_id = transactionId;
+          if (dataCreator) requestBody.data_creator = dataCreator;
+          if (isStartWorkflow !== undefined) requestBody.is_start_workflow = isStartWorkflow;
+          if (isStartTrigger !== undefined) requestBody.is_start_trigger = isStartTrigger;
+
+          const response = await httpRequest(`${baseUrl}/api/v5/app/entry/data/create`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${appKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+          });
+
+          return {
+            content: [{
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                data: response,
+                formUsed: resolved.formId,
+                fieldMapping: mappingResult.fieldInfo,
+                message: '单条提交成功'
+              }, null, 2)
+            }]
+          };
+        }
       } catch (error) {
         return {
           content: [{
@@ -470,13 +514,17 @@ function defineTools(): void {
   registerTool(
     {
       name: 'query_form_data',
-      description: '查询表单中的数据。支持按条件过滤、分页查询、获取单条数据',
+      description: '查询表单中的数据。支持按条件过滤、分页查询、获取单条数据。过滤条件支持多种字段类型和查询方法。',
       inputSchema: {
         type: 'object',
         properties: {
           formId: {
             type: 'string',
             description: '表单ID或应用ID'
+          },
+          appId: {
+            type: 'string',
+            description: '应用ID（必需）'
           },
           dataId: {
             type: 'string',
@@ -485,36 +533,41 @@ function defineTools(): void {
           fields: {
             type: 'array',
             items: { type: 'string' },
-            description: '可选：要返回的字段列表'
+            description: '可选：要返回的字段列表，如 ["_widget_1508400000001", "_widget_1508400000002"]'
           },
           filter: {
             type: 'object',
-            description: '可选：过滤条件'
+            description: '可选：过滤条件，支持复杂查询。格式：{ rel: "and"|"or", cond: [{ field, type, method, value }] }。字段类型(type): text, number, datetime, flowstate, user, dept, phone, combocheck, usergroup, deptgroup, lookup, dataid。查询方法(method): eq(等于), ne(不等于), in(包含于), nin(不包含于), like(模糊匹配), range(范围), empty(为空), not_empty(不为空), gt(大于), lt(小于), all(全部包含), verified(已验证), unverified(未验证)。示例：{ rel: "and", cond: [{ field: "_widget_xxx", type: "text", method: "like", value: ["关键词"] }] }'
           },
           limit: {
             type: 'number',
-            description: '可选：返回的最大记录数（默认10，最大100）'
+            description: '可选：返回的最大记录数（默认10，最大100，0表示获取全部）'
+          },
+          skip: {
+            type: 'number',
+            description: '可选：跳过的记录数，用于分页'
           },
           sort: {
             type: 'object',
-            description: '可选：排序条件，默认按照创建时间倒序（从新到旧）',
+            description: '可选：排序条件',
             properties: {
               field: {
                 type: 'string',
-                description: '排序字段，默认：createTime'
+                description: '排序字段，如 createTime、updateTime 或字段ID'
               },
               order: {
                 type: 'string',
-                description: '排序方向，asc（正序）或 desc（倒序），默认：desc'
+                description: '排序方向，asc（正序）或 desc（倒序）',
+                enum: ['asc', 'desc']
               }
             }
           }
         },
-        required: ['formId']
+        required: ['formId', 'appId']
       }
     },
     async (args) => {
-      const { formId, dataId, fields, filter, sort } = args;
+      const { formId, dataId, fields, filter, skip } = args;
       let appId: string | undefined;
       let appKey: string;
       let baseUrl: string;
@@ -549,9 +602,17 @@ function defineTools(): void {
 
       // 验证 limit 参数
       let limit = args.limit;
-      if (typeof limit !== 'number' || limit < 1) {
-        limit = 0; // limit=0 表示获取全部数据
+      if (typeof limit !== 'number' || limit < 0) {
+        limit = 100; // 默认返回100条
       }
+      if (limit > 100) {
+        limit = 100; // 最大100条
+      }
+
+      // 获取排序参数
+      const sort = args.sort;
+      const sortField = sort?.field || 'createTime';
+      const sortOrder = sort?.order || 'desc';
 
       try {
         // 直接使用传入的参数，不调用 resolveFormId
@@ -583,15 +644,28 @@ function defineTools(): void {
           };
         }
 
-        // 查询多条数据，使用 limit=0 获取全部数据
+        // 构建查询多条数据的请求体
         const requestBody: Record<string, any> = {
           app_id: appId,
           entry_id: actualFormId,
-          limit: limit // 0 表示获取全部数据
+          limit: limit
         };
 
-        if (fields) requestBody.fields = fields;
-        if (filter) requestBody.filter = filter;
+        // 添加 fields 参数
+        if (fields && Array.isArray(fields) && fields.length > 0) {
+          requestBody.fields = fields;
+        }
+
+        // 添加 filter 参数 - 支持完整的过滤条件格式
+        // 文档格式: { rel: "and"|"or", cond: [{ field, type, method, value }] }
+        if (filter) {
+          requestBody.filter = filter;
+        }
+
+        // 添加 skip 参数（分页偏移）
+        if (typeof skip === 'number' && skip >= 0) {
+          requestBody.skip = skip;
+        }
 
         const response = await httpRequest(`${baseUrl}/api/v5/app/entry/data/list`, {
           method: 'POST',
@@ -604,13 +678,30 @@ function defineTools(): void {
 
         const dataList = response || [];
 
-        // 按照创建时间倒序排序（从新到旧）
+        // 客户端排序（如果指定了排序字段）
         let sortedResponse = dataList;
-        if (Array.isArray(dataList)) {
+        if (Array.isArray(dataList) && dataList.length > 0) {
           sortedResponse = dataList.sort((a: any, b: any) => {
-            const timeA = a.createTime ? new Date(a.createTime).getTime() : 0;
-            const timeB = b.createTime ? new Date(b.createTime).getTime() : 0;
-            return timeB - timeA;
+            let valueA = a[sortField];
+            let valueB = b[sortField];
+            
+            // 处理时间字段
+            if (sortField === 'createTime' || sortField === 'updateTime' || 
+                (valueA && typeof valueA === 'string' && valueA.includes('T'))) {
+              valueA = valueA ? new Date(valueA).getTime() : 0;
+              valueB = valueB ? new Date(valueB).getTime() : 0;
+            }
+            
+            // 处理数字字段
+            if (typeof valueA === 'number' && typeof valueB === 'number') {
+              return sortOrder === 'asc' ? valueA - valueB : valueB - valueA;
+            }
+            
+            // 处理字符串字段
+            const strA = String(valueA || '');
+            const strB = String(valueB || '');
+            const compareResult = strA.localeCompare(strB);
+            return sortOrder === 'asc' ? compareResult : -compareResult;
           });
         }
 
@@ -620,7 +711,15 @@ function defineTools(): void {
             text: JSON.stringify({
               success: true,
               data: sortedResponse,
-              total: dataList.length
+              total: Array.isArray(dataList) ? dataList.length : 0,
+              query: {
+                formId: actualFormId,
+                appId: appId,
+                limit: limit,
+                skip: skip || 0,
+                hasFilter: !!filter,
+                sort: { field: sortField, order: sortOrder }
+              }
             }, null, 2)
           }]
         };
@@ -643,7 +742,12 @@ function defineTools(): void {
   registerTool(
     {
       name: 'update_form_data',
-      description: '更新表单中的现有数据',
+      description: `更新表单中的数据。
+
+**单条更新**: \`dataId\` 传入单个数据ID（string），仅更新指定数据。
+**批量更新**: \`dataId\` 传入数据ID数组（string[]），将多条数据统一更新为相同的值。
+
+注：批量更新最多支持 100 条；不支持子表单字段；附件/图片字段更新时会清除原有文件。`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -651,32 +755,50 @@ function defineTools(): void {
             type: 'string',
             description: '表单ID或应用ID'
           },
-          dataId: {
+          appId: {
             type: 'string',
-            description: '要更新的数据ID'
+            description: '应用ID（必需）'
+          },
+          dataId: {
+            oneOf: [
+              { type: 'string', description: '单条更新：要更新的数据ID' },
+              { type: 'array', items: { type: 'string' }, description: '批量更新：要更新的数据ID数组（最多100个）' }
+            ],
+            description: '要更新的数据ID（单条传string，批量传string[]）'
           },
           data: {
             type: 'object',
-            description: '要更新的数据'
+            description: '要更新的数据，键为字段名，值为字段值'
           },
           transactionId: {
             type: 'string',
-            description: '可选：事务ID'
+            description: '可选：事务ID（批量更新时用于绑定文件上传）'
           },
           isStartTrigger: {
             type: 'boolean',
-            description: '可选：是否触发自动化'
+            description: '可选：是否触发智能助手（仅单条更新有效）'
           }
         },
-        required: ['formId', 'dataId', 'data']
+        required: ['formId', 'dataId', 'data', 'appId']
       }
     },
     async (args) => {
+      // 判断是单条还是批量
+      const isBatch = Array.isArray(args.dataId);
+
       // 验证必需参数
       const validationRules: Record<string, ValidationRule> = {
         formId: { required: true, type: 'string', minLength: 1 },
-        dataId: { required: true, type: 'string', minLength: 1 },
-        data: { required: true, type: 'object' }
+        data: { required: true, type: 'object' },
+        dataId: {
+          required: true,
+          validator: (value: any): boolean => {
+            if (typeof value === 'string') return true;
+            if (Array.isArray(value) && value.every((id: any) => typeof id === 'string')) return true;
+            return false;
+          },
+          message: 'dataId 必须是字符串或字符串数组'
+        }
       };
 
       const validation = validateInput(args, validationRules);
@@ -697,7 +819,7 @@ function defineTools(): void {
       let appId: string | undefined;
       let appKey: string;
       let baseUrl: string;
-      
+
       try {
         ({ appId, appKey, baseUrl } = getDefaultParams(args));
       } catch (error) {
@@ -728,34 +850,76 @@ function defineTools(): void {
 
       try {
         const resolved = await resolveFormId(formId, appKey, baseUrl);
-        
-        const requestBody: Record<string, any> = {
-          entry_id: resolved.formId,
-          data_id: dataId,
-          data: data
-        };
 
-        if (transactionId) requestBody.transaction_id = transactionId;
-        if (isStartTrigger !== undefined) requestBody.is_start_trigger = isStartTrigger;
+        // 包装 data 值为 {value: ...} 格式（简道云 API 要求）
+        const wrappedData: Record<string, any> = {};
+        for (const [key, val] of Object.entries(data)) {
+          wrappedData[key] = { value: val };
+        }
 
-        const response = await httpRequest(`${baseUrl}/api/v5/app/entry/data/update`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${appKey}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(requestBody)
-        });
+        if (isBatch) {
+          // 批量更新：POST /data/batch_update
+          const requestBody: Record<string, any> = {
+            app_id: appId,
+            entry_id: resolved.formId,
+            data_ids: dataId,
+            data: wrappedData
+          };
 
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({
-              success: true,
-              data: response
-            }, null, 2)
-          }]
-        };
+          if (transactionId) requestBody.transaction_id = transactionId;
+
+          const response = await httpRequest(`${baseUrl}/api/v5/app/entry/data/batch_update`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${appKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+          });
+
+          return {
+            content: [{
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                data: response,
+                updatedIds: dataId,
+                message: `批量更新完成，共更新 ${dataId.length} 条数据`
+              }, null, 2)
+            }]
+          };
+        } else {
+          // 单条更新：POST /data/update
+          const requestBody: Record<string, any> = {
+            app_id: appId,
+            entry_id: resolved.formId,
+            data_id: dataId as string,
+            data: wrappedData
+          };
+
+          if (transactionId) requestBody.transaction_id = transactionId;
+          if (isStartTrigger !== undefined) requestBody.is_start_trigger = isStartTrigger;
+
+          const response = await httpRequest(`${baseUrl}/api/v5/app/entry/data/update`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${appKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+          });
+
+          return {
+            content: [{
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                data: response,
+                message: '单条更新成功'
+              }, null, 2)
+            }]
+          };
+        }
       } catch (error) {
         return {
           content: [{
@@ -771,11 +935,14 @@ function defineTools(): void {
     }
   );
 
-  // 删除表单数据
+  // 删除表单数据（支持单条和批量删除）
   registerTool(
     {
       name: 'delete_form_data',
-      description: '删除表单中的数据，支持批量删除',
+      description: `删除表单中的数据。
+
+**单条删除**: \`dataIds\` 传入单个数据ID（string），使用单条删除接口（频率 20次/秒）。
+**批量删除**: \`dataIds\` 传入数据ID数组（string[]），使用批量删除接口（频率 10次/秒）。`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -783,19 +950,23 @@ function defineTools(): void {
             type: 'string',
             description: '表单ID或应用ID'
           },
+          appId: {
+            type: 'string',
+            description: '应用ID（必需）'
+          },
           dataIds: {
             oneOf: [
-              { type: 'string' },
-              { type: 'array', items: { type: 'string' } }
+              { type: 'string', description: '单条删除：要删除的数据ID' },
+              { type: 'array', items: { type: 'string' }, description: '批量删除：要删除的数据ID数组' }
             ],
-            description: '要删除的数据ID或ID数组'
+            description: '要删除的数据ID（单条传string，批量传string[]）'
           },
           isStartTrigger: {
             type: 'boolean',
-            description: '可选：是否触发自动化'
+            description: '可选：是否触发智能助手'
           }
         },
-        required: ['formId', 'dataIds']
+        required: ['formId', 'dataIds', 'appId']
       }
     },
     async (args) => {
@@ -806,7 +977,7 @@ function defineTools(): void {
           required: true,
           validator: (value: any): boolean => {
             if (typeof value === 'string') return true;
-            if (Array.isArray(value) && value.every(id => typeof id === 'string')) return true;
+            if (Array.isArray(value) && value.every((id: any) => typeof id === 'string')) return true;
             return false;
           },
           message: 'dataIds 必须是字符串或字符串数组'
@@ -831,7 +1002,7 @@ function defineTools(): void {
       let appId: string | undefined;
       let appKey: string;
       let baseUrl: string;
-      
+
       try {
         ({ appId, appKey, baseUrl } = getDefaultParams(args));
       } catch (error) {
@@ -862,35 +1033,70 @@ function defineTools(): void {
 
       try {
         const resolved = await resolveFormId(formId, appKey, baseUrl);
-        
+
         const ids = Array.isArray(dataIds) ? dataIds : [dataIds];
+        const isBatch = ids.length > 1;
 
-        const requestBody: Record<string, any> = {
-          entry_id: resolved.formId,
-          data_ids: ids
-        };
+        if (isBatch) {
+          // 批量删除：POST /data/batch_delete
+          const requestBody: Record<string, any> = {
+            app_id: appId,
+            entry_id: resolved.formId,
+            data_ids: ids
+          };
 
-        if (isStartTrigger !== undefined) requestBody.is_start_trigger = isStartTrigger;
+          if (isStartTrigger !== undefined) requestBody.is_start_trigger = isStartTrigger;
 
-        const response = await httpRequest(`${baseUrl}/api/v5/app/entry/data/delete`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${appKey}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(requestBody)
-        });
+          const response = await httpRequest(`${baseUrl}/api/v5/app/entry/data/batch_delete`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${appKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+          });
 
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({
-              success: true,
-              data: response,
-              deletedCount: ids.length
-            }, null, 2)
-          }]
-        };
+          return {
+            content: [{
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                data: response,
+                deletedCount: ids.length,
+                message: `批量删除完成，共删除 ${ids.length} 条数据`
+              }, null, 2)
+            }]
+          };
+        } else {
+          // 单条删除：POST /data/delete
+          const requestBody: Record<string, any> = {
+            app_id: appId,
+            entry_id: resolved.formId,
+            data_id: ids[0]
+          };
+
+          if (isStartTrigger !== undefined) requestBody.is_start_trigger = isStartTrigger;
+
+          const response = await httpRequest(`${baseUrl}/api/v5/app/entry/data/delete`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${appKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+          });
+
+          return {
+            content: [{
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                data: response,
+                message: '单条删除成功'
+              }, null, 2)
+            }]
+          };
+        }
       } catch (error) {
         return {
           content: [{
@@ -1186,7 +1392,7 @@ function defineTools(): void {
 
         if (fieldId) requestBody.field_id = fieldId;
 
-        const response = await httpRequest(`${baseUrl}/api/v5/app/entry/data/upload/token`, {
+        const response = await httpRequest(`${baseUrl}/api/v5/app/entry/file/get_upload_token`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${appKey}`,
@@ -1504,19 +1710,6 @@ function defineTools(): void {
       let resolvedUsername = username;
 
       if (!username && name) {
-        if (!name) {
-          return {
-            content: [{
-              type: 'text',
-              text: JSON.stringify({
-                success: false,
-                error: true,
-                message: '请提供 username 或 name 参数（name为成员姓名，username为成员编号）'
-              }, null, 2)
-            }]
-          };
-        }
-
         try {
           const membersResponse = await httpRequest<any>(`${baseUrl}/api/v5/corp/user/list`, {
             method: 'POST',

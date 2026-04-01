@@ -104,30 +104,29 @@ npm run build
 }
 ```
 
-#### Claude Code 配置
+#### Claude Code CLI 配置
 
-编辑 `%APPDATA%\Claude\claude_desktop_config.json`（Windows）或 `~/Library/Application Support/Claude/claude_desktop_config.json`（macOS）：
+在项目根目录创建 `.mcp.json` 文件：
+
+```bash
+# 方式1：使用 mcp add 命令（会自动创建配置）
+mcp add jiandaoyun-mcp "node" "D:\\Trae CN\\project\\pro_1\\jiandaoyun-mcp\\jiandaoyun-mcp\\build\\index.js"
+```
+
+或者手动创建 `.mcp.json`（不支持 env 字段，环境变量需通过 .env 文件配置）：
 
 ```json
 {
   "mcpServers": {
-   "jiandaoyun-mcp": {
-      "type": "stdio",
+    "jiandaoyun-mcp": {
       "command": "node",
-      "args": [
-        "D:\\Trae CN\\project\\pro_1\\jiandaoyun-mcp\\jiandaoyun-mcp\\build\\index.js"
-      ],
-      "env": {
-        "JIANDAOYUN_API_KEY": "YOUR_API_KEY_HERE",
-        "JIANDAOYUN_APP_ID": "",
-        "JIANDAOYUN_BASE_URL": "https://api.jiandaoyun.com"
-      }
+      "args": ["D:\\Trae CN\\project\\pro_1\\jiandaoyun-mcp\\jiandaoyun-mcp\\build\\index.js"]
     }
   }
 }
 ```
 
-> ⚠️ 注意：Windows 路径需要使用双反斜杠 `\\`
+> ⚠️ 环境变量（JIANDAOYUN_API_KEY 等）需在项目根目录的 `.env` 文件中配置
 
 ### 验证配置
 
@@ -216,11 +215,20 @@ jiandaoyun-mcp/
 
 ### 如何开启 HTTP 远程访问？
 
-```bash
-npm run start:http
+在 `.env` 文件中设置传输模式：
+
+```
+TRANSPORT_MODE=http
+HTTP_PORT=3000
 ```
 
-默认端口为 3000，可通过环境变量 `PORT` 修改。
+然后启动服务：
+
+```bash
+npm run start
+```
+
+默认端口为 3000，可通过环境变量 `HTTP_PORT` 修改。
 
 ## 许可证
 

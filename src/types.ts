@@ -81,14 +81,79 @@ export interface SubmitDataOptions {
 }
 
 /**
+ * 过滤条件字段类型
+ * - text: 文本字段
+ * - number: 数字字段
+ * - datetime: 日期时间字段
+ * - flowstate: 流程状态字段
+ * - user: 成员字段
+ * - dept: 部门字段
+ * - phone: 电话字段
+ * - combocheck: 复选框字段
+ * - usergroup: 成员组字段
+ * - deptgroup: 部门组字段
+ * - lookup: 关联字段
+ * - dataid: 数据ID字段
+ */
+export type FilterFieldType = 'text' | 'number' | 'datetime' | 'flowstate' | 'user' | 'dept' | 'phone' | 'combocheck' | 'usergroup' | 'deptgroup' | 'lookup' | 'dataid';
+
+/**
+ * 过滤条件方法
+ * - eq: 等于
+ * - ne: 不等于
+ * - in: 包含于（多选一）
+ * - nin: 不包含于
+ * - like: 模糊匹配（包含）
+ * - range: 范围查询（数字、日期）
+ * - empty: 为空
+ * - not_empty: 不为空
+ * - gt: 大于
+ * - lt: 小于
+ * - all: 全部包含（复选框）
+ * - verified: 已验证（电话字段）
+ * - unverified: 未验证（电话字段）
+ */
+export type FilterMethod = 'eq' | 'ne' | 'in' | 'nin' | 'like' | 'range' | 'empty' | 'not_empty' | 'gt' | 'lt' | 'all' | 'verified' | 'unverified';
+
+/**
+ * 单个过滤条件
+ */
+export interface FilterCondition {
+  field: string;
+  type: FilterFieldType;
+  method: FilterMethod;
+  value?: string | number | boolean | (string | number)[];
+}
+
+/**
+ * 过滤条件组合
+ * - rel: 关系类型，and（且）或 or（或）
+ * - cond: 条件数组，可嵌套 FilterConditionGroup
+ */
+export interface FilterConditionGroup {
+  rel: 'and' | 'or';
+  cond: (FilterCondition | FilterConditionGroup)[];
+}
+
+/**
+ * 排序条件
+ */
+export interface SortCondition {
+  field: string;
+  order: 'asc' | 'desc';
+}
+
+/**
  * 表单数据查询选项
  */
 export interface QueryDataOptions {
   formId: string;
   dataId?: string;
   fields?: string[];
-  filter?: Record<string, any>;
+  filter?: FilterConditionGroup;
   limit?: number;
+  skip?: number;
+  sort?: SortCondition;
 }
 
 /**
@@ -102,8 +167,9 @@ export interface UpdateDataOptions {
 /**
  * 删除数据选项
  */
-export interface DeleteDataOptions {
+export interface DeleteDataOptions{
   isStartTrigger?: boolean;
+  transactionId?: string;
 }
 
 /**

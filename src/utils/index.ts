@@ -79,9 +79,6 @@ async function httpRequest<T = any>(
 
       const data = await response.json() as any;
 
-      // 调试：查看完整的响应数据
-      console.error(`[DEBUG] HTTP 响应完整数据:`, data);
-
       // 检查简道云 API 返回的错误码
       if (data.code !== undefined && data.code !== 0) {
         throw new McpError(
@@ -92,21 +89,23 @@ async function httpRequest<T = any>(
 
       // 处理简道云 API 的响应格式
       // 有些接口返回 {"code": 0, "data": [...]}，有些返回 {"apps": [...]} 等
+      let result: any;
       if (data.data !== undefined) {
-        return data.data as T;
+        result = data.data;
       } else if (data.apps !== undefined) {
         // 应用列表接口返回 {"apps": [...]}
-        return data.apps as T;
+        result = data.apps;
       } else if (data.forms !== undefined) {
         // 表单列表接口返回 {"forms": [...]}
-        return data.forms as T;
+        result = data.forms;
       } else if (data.widgets !== undefined) {
         // 字段列表接口返回 {"widgets": [...]}
-        return data as T;
+        result = data;
       } else {
         // 其他接口直接返回数据
-        return data as T;
+        result = data;
       }
+      return result as T;
     } catch (error) {
       lastError = error as Error;
 

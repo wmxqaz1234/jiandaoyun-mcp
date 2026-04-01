@@ -12,7 +12,9 @@ import type {
   SubmitDataOptions,
   QueryDataOptions,
   UpdateDataOptions,
-  DeleteDataOptions
+  DeleteDataOptions,
+  FilterConditionGroup,
+  SortCondition
 } from './types.js';
 import { httpRequest, getAppList, resolveFormId } from './utils/index.js';
 
@@ -65,12 +67,13 @@ export class JianDaoYunClient {
    */
   async getForms(appId: string): Promise<JianDaoYunForm[]> {
     try {
-      const data = await httpRequest<{ forms?: JianDaoYunForm[] }>(`${this.baseUrl}/api/v5/app/entry/list`, {
+      const data = await httpRequest<JianDaoYunForm[]>(`${this.baseUrl}/api/v5/app/entry/list`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
         body: JSON.stringify({ app_id: appId, skip: 0, limit: 0 })
       });
-      return data?.forms || [];
+      // httpRequest 已经提取 forms 数组，直接返回
+      return Array.isArray(data) ? data : [];
     } catch (error) {
       throw new McpError(
         ErrorCode.InternalError,
@@ -115,7 +118,7 @@ export class JianDaoYunClient {
   }
 
   /**
-   * 提交表单数据
+   * 提交表单数据（单条或多条）
    * @param options - 提交选项
    * @returns 提交结果
    */
@@ -124,24 +127,61 @@ export class JianDaoYunClient {
 
     try {
       const resolved = await resolveFormId(formId, this.appKey, this.baseUrl);
-      
-      const requestBody: Record<string, any> = {
-        entry_id: resolved.formId,
-        data: data
+
+      // 判断是单条还是多条提交
+      const isBatch = Array.isArray(data);
+
+      // 包装数据为 {value: ...} 格式
+      const wrapData = (item: Record<string, any>): Record<string, any> => {
+        const wrapped: Record<string, any> = {};
+        for (const [key, val] of Object.entries(item)) {
+          wrapped[key] = { value: val };
+        }
+        return wrapped;
       };
 
-      if (transactionId) requestBody.transaction_id = transactionId;
-      if (dataCreator) requestBody.data_creator = dataCreator;
-      if (isStartWorkflow !== undefined) requestBody.is_start_workflow = isStartWorkflow;
-      if (isStartTrigger !== undefined) requestBody.is_start_trigger = isStartTrigger;
+      if (isBatch) {
+        // 批量提交：POST /data/batch_create
+        const requestBody: Record<string, any> = {
+          app_id: this.defaultAppId || resolved.appId,
+          entry_id: resolved.formId,
+          data_list: (data as Record<string, any>[]).map(wrapData)
+        };
 
-      const result = await httpRequest(`${this.baseUrl}/api/v5/app/entry/data/create`, {
-        method: 'POST',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(requestBody)
-      });
+        if (transactionId) requestBody.transaction_id = transactionId;
+        if (dataCreator) requestBody.data_creator = dataCreator;
+        if (isStartWorkflow !== undefined) requestBody.is_start_workflow = isStartWorkflow;
 
-      return result;
+        const result = await httpRequest(`${this.baseUrl}/api/v5/app/entry/data/batch_create`, {
+          method: 'POST',
+          headers: this.getAuthHeaders(),
+          body: JSON.stringify(requestBody)
+        });
+
+        return result;
+      } else {
+        // 单条提交：POST /data/create
+        const wrappedData = wrapData(data as Record<string, any>);
+
+        const requestBody: Record<string, any> = {
+          app_id: this.defaultAppId || resolved.appId,
+          entry_id: resolved.formId,
+          data: wrappedData
+        };
+
+        if (transactionId) requestBody.transaction_id = transactionId;
+        if (dataCreator) requestBody.data_creator = dataCreator;
+        if (isStartWorkflow !== undefined) requestBody.is_start_workflow = isStartWorkflow;
+        if (isStartTrigger !== undefined) requestBody.is_start_trigger = isStartTrigger;
+
+        const result = await httpRequest(`${this.baseUrl}/api/v5/app/entry/data/create`, {
+          method: 'POST',
+          headers: this.getAuthHeaders(),
+          body: JSON.stringify(requestBody)
+        });
+
+        return result;
+      }
     } catch (error) {
       if (error instanceof McpError) {
         throw error;
@@ -155,11 +195,15 @@ export class JianDaoYunClient {
 
   /**
    * 查询表单数据
+   * 支持完整的过滤条件格式，包括：
+   * - 字段类型: text, number, datetime, flowstate, user, dept, phone, combocheck, usergroup, deptgroup, lookup, dataid
+   * - 查询方法: eq, ne, in, nin, like, range, empty, not_empty, gt, lt, all, verified, unverified
+   * - 条件组合: and/or 嵌套查询
    * @param options - 查询选项
    * @returns 查询结果
    */
   async queryData(options: QueryDataOptions): Promise<any> {
-    const { formId, dataId, fields, filter, limit = 10 } = options;
+    const { formId, dataId, fields, filter, limit = 10, skip, sort } = options;
 
     try {
       const resolved = await resolveFormId(formId, this.appKey, this.baseUrl);
@@ -170,6 +214,7 @@ export class JianDaoYunClient {
           method: 'POST',
           headers: this.getAuthHeaders(),
           body: JSON.stringify({
+            app_id: this.defaultAppId || resolved.appId,
             entry_id: resolved.formId,
             data_id: dataId
           })
@@ -177,14 +222,28 @@ export class JianDaoYunClient {
         return result;
       }
 
-      // 否则查询多条数据
+      // 构建查询多条数据的请求体
       const requestBody: Record<string, any> = {
+        app_id: this.defaultAppId || resolved.appId,
         entry_id: resolved.formId,
         limit: limit
       };
 
-      if (fields) requestBody.fields = fields;
-      if (filter) requestBody.filter = filter;
+      // 添加 fields 参数
+      if (fields && fields.length > 0) {
+        requestBody.fields = fields;
+      }
+
+      // 添加 filter 参数 - 支持完整的过滤条件格式
+      // 文档格式: { rel: "and"|"or", cond: [{ field, type, method, value }] }
+      if (filter) {
+        requestBody.filter = filter;
+      }
+
+      // 添加 skip 参数（分页偏移）
+      if (typeof skip === 'number' && skip >= 0) {
+        requestBody.skip = skip;
+      }
 
       const result = await httpRequest(`${this.baseUrl}/api/v5/app/entry/data/list`, {
         method: 'POST',
@@ -192,7 +251,35 @@ export class JianDaoYunClient {
         body: JSON.stringify(requestBody)
       });
 
-      return result;
+      // 如果指定了排序，进行客户端排序
+      let sortedResult = result;
+      if (sort && Array.isArray(result)) {
+        const { field, order } = sort;
+        sortedResult = result.sort((a: any, b: any) => {
+          let valueA = a[field];
+          let valueB = b[field];
+          
+          // 处理时间字段
+          if (field === 'createTime' || field === 'updateTime' || 
+              (valueA && typeof valueA === 'string' && valueA.includes('T'))) {
+            valueA = valueA ? new Date(valueA).getTime() : 0;
+            valueB = valueB ? new Date(valueB).getTime() : 0;
+          }
+          
+          // 处理数字字段
+          if (typeof valueA === 'number' && typeof valueB === 'number') {
+            return order === 'asc' ? valueA - valueB : valueB - valueA;
+          }
+          
+          // 处理字符串字段
+          const strA = String(valueA || '');
+          const strB = String(valueB || '');
+          const compareResult = strA.localeCompare(strB);
+          return order === 'asc' ? compareResult : -compareResult;
+        });
+      }
+
+      return sortedResult;
     } catch (error) {
       if (error instanceof McpError) {
         throw error;
@@ -205,38 +292,70 @@ export class JianDaoYunClient {
   }
 
   /**
-   * 更新表单数据
+   * 更新表单数据（支持单条和批量更新）
    * @param formId - 表单ID
-   * @param dataId - 数据ID
+   * @param dataId - 数据ID（单条更新传 string，批量更新传 string[]）
    * @param data - 更新数据
    * @param options - 更新选项
    * @returns 更新结果
    */
   async updateData(
     formId: string,
-    dataId: string,
+    dataId: string | string[],
     data: Record<string, any>,
     options: UpdateDataOptions = {}
   ): Promise<any> {
     try {
       const resolved = await resolveFormId(formId, this.appKey, this.baseUrl);
 
-      const requestBody: Record<string, any> = {
-        entry_id: resolved.formId,
-        data_id: dataId,
-        data: data
-      };
+      // 包装 data 值为 {value: ...} 格式（简道云 API 要求）
+      const wrappedData: Record<string, any> = {};
+      for (const [key, val] of Object.entries(data)) {
+        wrappedData[key] = { value: val };
+      }
 
-      if (options.transactionId) requestBody.transaction_id = options.transactionId;
-      if (options.isStartTrigger !== undefined) requestBody.is_start_trigger = options.isStartTrigger;
+      // 判断是单条还是批量更新
+      const isBatch = Array.isArray(dataId);
 
-      const result = await httpRequest(`${this.baseUrl}/api/v5/app/entry/data/update`, {
-        method: 'POST',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(requestBody)
-      });
+      if (isBatch) {
+        // 批量更新：POST /data/batch_update
+        // 注：batch_update 不支持子表单
+        const requestBody: Record<string, any> = {
+          app_id: this.defaultAppId || resolved.appId,
+          entry_id: resolved.formId,
+          data_ids: dataId,
+          data: wrappedData
+        };
 
-      return result;
+        if (options.transactionId) requestBody.transaction_id = options.transactionId;
+
+        const result = await httpRequest(`${this.baseUrl}/api/v5/app/entry/data/batch_update`, {
+          method: 'POST',
+          headers: this.getAuthHeaders(),
+          body: JSON.stringify(requestBody)
+        });
+
+        return result;
+      } else {
+        // 单条更新：POST /data/update
+        const requestBody: Record<string, any> = {
+          app_id: this.defaultAppId || resolved.appId,
+          entry_id: resolved.formId,
+          data_id: dataId as string,
+          data: wrappedData
+        };
+
+        if (options.transactionId) requestBody.transaction_id = options.transactionId;
+        if (options.isStartTrigger !== undefined) requestBody.is_start_trigger = options.isStartTrigger;
+
+        const result = await httpRequest(`${this.baseUrl}/api/v5/app/entry/data/update`, {
+          method: 'POST',
+          headers: this.getAuthHeaders(),
+          body: JSON.stringify(requestBody)
+        });
+
+        return result;
+      }
     } catch (error) {
       if (error instanceof McpError) {
         throw error;
@@ -249,7 +368,7 @@ export class JianDaoYunClient {
   }
 
   /**
-   * 删除表单数据
+   * 删除表单数据（支持单条和批量删除）
    * @param formId - 表单ID
    * @param dataIds - 数据ID或ID数组
    * @param options - 删除选项
@@ -264,21 +383,46 @@ export class JianDaoYunClient {
       const resolved = await resolveFormId(formId, this.appKey, this.baseUrl);
 
       const ids = Array.isArray(dataIds) ? dataIds : [dataIds];
+      const isBatch = ids.length > 1;
 
-      const requestBody: Record<string, any> = {
-        entry_id: resolved.formId,
-        data_ids: ids
-      };
+      let requestBody: Record<string, any>;
 
-      if (options.isStartTrigger !== undefined) requestBody.is_start_trigger = options.isStartTrigger;
+      if (isBatch) {
+        // 批量删除：POST /data/batch_delete
+        requestBody = {
+          app_id: this.defaultAppId || resolved.appId,
+          entry_id: resolved.formId,
+          data_ids: ids
+        };
 
-      const result = await httpRequest(`${this.baseUrl}/api/v5/app/entry/data/delete`, {
-        method: 'POST',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(requestBody)
-      });
+        if (options.isStartTrigger !== undefined) requestBody.is_start_trigger = options.isStartTrigger;
+        if (options.transactionId) requestBody.transaction_id = options.transactionId;
 
-      return result;
+        const result = await httpRequest(`${this.baseUrl}/api/v5/app/entry/data/batch_delete`, {
+          method: 'POST',
+          headers: this.getAuthHeaders(),
+          body: JSON.stringify(requestBody)
+        });
+
+        return result;
+      } else {
+        // 单条删除：POST /data/delete
+        requestBody = {
+          app_id: this.defaultAppId || resolved.appId,
+          entry_id: resolved.formId,
+          data_id: ids[0]
+        };
+
+        if (options.isStartTrigger !== undefined) requestBody.is_start_trigger = options.isStartTrigger;
+
+        const result = await httpRequest(`${this.baseUrl}/api/v5/app/entry/data/delete`, {
+          method: 'POST',
+          headers: this.getAuthHeaders(),
+          body: JSON.stringify(requestBody)
+        });
+
+        return result;
+      }
     } catch (error) {
       if (error instanceof McpError) {
         throw error;
@@ -364,7 +508,7 @@ export class JianDaoYunClient {
 
       if (fieldId) requestBody.field_id = fieldId;
 
-      const result = await httpRequest(`${this.baseUrl}/api/v5/app/entry/data/upload/token`, {
+      const result = await httpRequest(`${this.baseUrl}/api/v5/app/entry/file/get_upload_token`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
         body: JSON.stringify(requestBody)

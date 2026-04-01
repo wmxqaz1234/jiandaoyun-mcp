@@ -22,7 +22,15 @@
       "Bash(\"D:\\\\python\\\\python.exe\":*)",
       "mcp__web-search-prime__webSearchPrime",
       "mcp__web-reader__webReader",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Read(//c/Users/wmj87/.claude/skills/url-to-markdown/**)",
+      "Bash(npx -y bun scripts/main.ts \"https://hc.jiandaoyun.com/open/14222\" -o /tmp/jdy_doc_14222.md)",
+      "Bash(npx -y bun scripts/main.ts \"https://hc.jiandaoyun.com/open/14223\" -o /tmp/jdy_doc_14223.md)",
+      "Bash(npx -y bun scripts/main.ts \"https://hc.jiandaoyun.com/open/14224\" -o /tmp/jdy_doc_14224.md)",
+      "Bash(npx -y bun scripts/main.ts \"https://hc.jiandaoyun.com/open/14225\" -o /tmp/jdy_doc_14225.md)",
+      "Bash(npx -y bun scripts/main.ts \"https://hc.jiandaoyun.com/open/14226\" -o /tmp/jdy_doc_14226.md)",
+      "Bash(npx -y bun scripts/main.ts \"https://hc.jiandaoyun.com/open/14527\" -o /tmp/jdy_doc_14527.md)",
+      "WebFetch(domain:hc.jiandaoyun.com)"
     ]
   }
 }
