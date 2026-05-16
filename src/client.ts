@@ -70,7 +70,7 @@ export class JianDaoYunClient {
       const data = await httpRequest<JianDaoYunForm[]>(`${this.baseUrl}/api/v5/app/entry/list`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
-        body: JSON.stringify({ app_id: appId, skip: 0, limit: 0 })
+        body: JSON.stringify({ app_id: appId })
       });
       // httpRequest 已经提取 forms 数组，直接返回
       return Array.isArray(data) ? data : [];
@@ -502,6 +502,7 @@ export class JianDaoYunClient {
       const resolved = await resolveFormId(formId, this.appKey, this.baseUrl);
 
       const requestBody: Record<string, any> = {
+        app_id: this.defaultAppId || resolved.appId,
         entry_id: resolved.formId,
         transaction_id: transactionId
       };

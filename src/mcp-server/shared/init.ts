@@ -97,7 +97,7 @@ function defineTools(): void {
                 'Authorization': `Bearer ${appKey}`,
                 'Content-Type': 'application/json'
               },
-              body: JSON.stringify({ app_id: targetAppId, skip: 0, limit: 0 })
+              body: JSON.stringify({ app_id: targetAppId })
             });
             
             const forms = response || [];
@@ -1386,6 +1386,7 @@ function defineTools(): void {
         const resolved = await resolveFormId(formId, appKey, baseUrl);
         
         const requestBody: Record<string, any> = {
+          app_id: appId,
           entry_id: resolved.formId,
           transaction_id: transactionId
         };
