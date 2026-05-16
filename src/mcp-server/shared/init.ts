@@ -1611,15 +1611,15 @@ function defineTools(): void {
         });
 
         let logData = null;
-        if (includeLog && response.app_id && response.form_id) {
+        if (includeLog) {
           try {
-            const logResponse = await httpRequest(`${baseUrl}/api/v1/app/${response.app_id}/entry/${response.form_id}/workflow/log`, {
+            const logResponse = await httpRequest(`${baseUrl}/api/v1/workflow/instance/logs`, {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${appKey}`,
                 'Content-Type': 'application/json'
               },
-              body: JSON.stringify({ data_id: instanceId })
+              body: JSON.stringify({ instance_id: instanceId })
             });
             logData = logResponse;
           } catch (logError) {
