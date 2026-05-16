@@ -1308,7 +1308,7 @@ function defineTools(): void {
   registerTool(
     {
       name: 'get_upload_token',
-      description: '获取文件上传令牌，用于上传文件到简道云',
+      description: '获取文件上传令牌，用于上传文件到简道云。返回上传凭证(token)和七牛云上传地址(url)，以及用于后续数据写入的 transaction_id。上传流程：1) 调用本工具获取凭证 → 2) 用返回的 token 和 url 上传文件到七牛云(multipart/form-data, field=token+file) → 3) 用返回的 key(file_key) 写入记录的 upload/image 字段。',
       inputSchema: {
         type: 'object',
         properties: {
@@ -1318,7 +1318,7 @@ function defineTools(): void {
           },
           transactionId: {
             type: 'string',
-            description: '事务ID'
+            description: '事务ID（获取凭证、上传文件、写入数据三步必须使用同一个 transaction_id）'
           },
           fieldId: {
             type: 'string',
@@ -1353,7 +1353,7 @@ function defineTools(): void {
       let appId: string | undefined;
       let appKey: string;
       let baseUrl: string;
-      
+
       try {
         ({ appId, appKey, baseUrl } = getDefaultParams(args));
       } catch (error) {
@@ -1384,7 +1384,7 @@ function defineTools(): void {
 
       try {
         const resolved = await resolveFormId(formId, appKey, baseUrl);
-        
+
         const requestBody: Record<string, any> = {
           app_id: appId,
           entry_id: resolved.formId,
@@ -1402,12 +1402,18 @@ function defineTools(): void {
           body: JSON.stringify(requestBody)
         });
 
+        const tokens = response?.tokens || response;
+        const tokenItem = Array.isArray(tokens) ? tokens[0] : tokens;
+
         return {
           content: [{
             type: 'text',
             text: JSON.stringify({
               success: true,
-              data: response
+              transaction_id: transactionId,
+              upload_url: tokenItem?.url || '',
+              upload_token: tokenItem?.token || '',
+              next_step: `使用 curl 上传文件: curl -F 'token=${tokenItem?.token || ''}' -F 'file=@你的文件路径' ${tokenItem?.url || ''}  → 返回的 key 即为 file_key，用于写入 upload/image 字段`
             }, null, 2)
           }]
         };
